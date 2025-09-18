@@ -1,208 +1,138 @@
 package com.example.nubankcryptostela
 
-import android.os.Bundle
-import android.widget.Button
-import android.widget.Space
-import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Card
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.internal.composableLambda
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.modifier.modifierLocalOf
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavHost
 
 
-data class Crypto(val name: String, val price: Double, val variation: Double)
+data class Crypto(
+    val id: Int,
+    val name: String,
+    val symbol: String,
+    val price: Double,
+    val variation: Double,
+)
+
+val cryptoList = mutableListOf(
+    Crypto(1, "Bitcoin", "BTC", 123458.78, 2.5),
+    Crypto(2, "Ethereum", "ETH", 9876.54, -1.2),
+    Crypto(3, "Polygon", "MATIC", 5.12, 3.1)
+)
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState : Bundle?) {
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent{
-            val navController = rememberNavController()
-            navHost(navController, startDestination = "login") {
-                composable("login") { LoginScreen(navController) }
-                composable("list")  { CryptoListScreen(navController) }
-                composable("detail/{crypto}") { backStackEntry ->
-                    val cryptoName = backStackEntry.arguments?.getString("crypto") ?: ""
-                    CryptoDetailScreen(navController, cryptoName)
-                }
-                composable("buySell/{crypto}") { backStackEntry ->
-                    val cryptoName = backStackEntry.arguments?.getString("crypto") ?: ""
-                    BuySellScreen(navController, cryptoName)
+        setContent {
+            NubankCrypto(){
+                val navController = rememberNavController()
+                NavHost(navController = navController, startDestination = "cryptoList") {
+                    composable("cryptoList"){ CryptoListScreen(navController) }
+                    composable(
+                        "cryptoDetail/{cryptoId}",
+                        arguments = listOf(navArgument("cryptoId") { type = NavType.IntType })
+                    ) { backStackEntry ->
+                        val cryptoId = backStackEntry.arguments?.getInt("cryptoId") ?: 0
+                        val crypto = cryptoList.first { it.id == cryptoId }
+                        CryptoDetailScreen(navController, crypto)
+            }
+                    composable(
+                        "sell/{cryptoId}",
+                        arguments = listOf(navArgument("cryptoId") { type = NavType.IntType })
+                    ) { backStackEntry ->
+                        val cryptoId = backStackEntry.arguments?.getInt("cryptoId") ?: 0
+                        val crypto = cryptoList.first { it.id == cryptoId }
+                        TransactionScreen(navController, crypto, false)
+
+                    }
+
                 }
             }
         }
     }
 }
+@Composable
+fun CryptoListScreen(navController: NavHost) {
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Criptos") }) },
+
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(cryptoList) { crypto ->
+                CryptoCard(crypto) {
+                    navController.navigate("cryptoDetail/${crypto.id}")
+                }
+            }
+        }
+
+    }
+}
 
 @Composable
-fun loginScreen(navController: NavController){
-    val context = LocalContext.current
-    var email by remember { mutableStateOf(TextFieldValue(""))}
-    var password by remember { mutableStateOf(TextFieldValue(""))}
+fun CryptoCard(crypto: Crypto, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        elevation = CardDefaults.cardElevation(8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(text = crypto.name, fontWeight = FontWeight.Bold,fontSize = 18.sp)
+                Text(text = crypto.symbol)
+            }
+            Column {
+                Text(text = "R$ ${crypto.price}", fontWeight = FontWeight.Bold,fontSize = 18.sp)
+                Text(
+                    text = "${crypto.variation}%",
+                    color = if (crypto.variation >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                )
+            }
 
-    Scaffold { paddingValues ->
+        }
+
+    }
+}
+@Composable
+fun CryptoDetailScreen(navController: NavHost, crypto: Crypto) {
+    Scaffold(topBar = { TopAppBar(title = { Text(crypto.name) }) }) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(padding),
+            . padding (16.dp),
+        verticalArrangement = Arrangement.spaceBy(20.dp)
         ) {
-            TextField(
-                value = email,
-                onValueChange = { email = it},
-                label = { Text("Email ou CPF")}
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            TextField(
-                value = password,
-                onValueChange = { password = it },
-                label =  { Text("Senha") }
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = {
-                if(email.text.isNotEmpty() && password.text.isNotEmpty()) {
-                    navController.navigate("list")
-                } else {
-                    Toast.makeText(context, "Preencha todos os campos", Toast.LENGTH_SHORT).show()
-                }
-            }) {
-                Text("Entrar")
+        Text(text = "Preço Atual: R$ ${crypto.price}", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(
+            text = "Variação: ${crypto.variation}%",
+            fontSize = 18.sp,
+            color = if (crypto.variation >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            ActionButton(text = "Comprar") {
+                navController.navigate("buy/${crypto.id}")
             }
-        }
-    }
-}
-
-@Composable
-fun CryptoListScreen(navController: NavHostController) {
-    val cryptos = listOf(
-        Crypto("Bitcoin", 120000.0, +1.5),
-        Crypto("Ethereum", 9000.0, -0.5),
-        Crypto("Solana", 600.0, +3.2)
-    )
-    Scaffold(topBar = {
-        TopAppBar(title = { Text("Criptomoedas") })
-    }) { padding ->
-        LazyColumn(modifier = Modifier.padding(padding)) {
-            items(cryptos) {crypto ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    onClick = {
-                        navController.navigate("detail/${crypto.name}")
-                    }
-                ) }
-                    Row(
-                        modifier = Modifier
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(crypto.name, style = MaterialTheme.typography.titleMedium)
-                            Text("R$ ${crypto.price}")
-                        }
-                        Text("${crypto.variation}%")
-
-                    }
-        }
-    }
-}
-
-@Composable
-fun CryptoDetailScreen(navController: NavController, cryptoName: String) {
-    Scaffold(topBar ={
-        TopAppBar(title = { Text("Detalhes: $cryptoName")})
-    }) { padding ->
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment() = Alignment.Center
-                ) {
-                    Text("[Grafico do $cryptoName aqui]", style = MaterialTheme.typography.bodyLarge)
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.SpaceEvenly) {
-                    Button(onClick = { navController.navigate ("buySell/$cryptoName") }) {
-                        Text("Comprar")
-                    }
-                    Space(modifier = Modifier.width(16.dp))
-                    Button(onClick = { navController.navigate("buySell/$cryptoName") }) {
-                        Text("Vender")
-                    }
-                }
-
+            ActionButton(text = "Vender") {
+                navController.navigate("sell/${crypto.id}")
             }
-        }
-    }
-}
-
-@Composable
-fun BuySellScreen(navController: NavController, cryptoName: String) {
-    val context = LocalContext.current
-    var amount by remember { mutableStateOf(TextFieldValue("")) }
-
-
-    Scaffold(topBar = {
-        TopAppBar(title = { Text("$cryptoName - Comprar/Vender") })
-    }) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            TextField(
-                value = amount,
-                onValueChange = { amount = it },
-                label = { Text("Digite o valor em R$") }
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = {
-                if (amount.text.isNotEmpty()) {
-                    Toast.makeText(context, "Operação realizada com sucesso!", Toast.LENGTH_SHORT).show()
-                    navController.popBackStack()
-                } else {
-                    Toast.makeText(context, "Digite um valor", Toast.LENGTH_SHORT).show()
-                }
-            }) {
-                Text("Confirmar")
-            }
-        }
+         }
+      }
     }
 }
